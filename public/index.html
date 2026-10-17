@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Property Engine - Simulation Dashboard</title>
+  
+  <!-- Google Fonts: Inter & Cairo -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'Cairo', 'sans-serif'],
+            arabic: ['Cairo', 'Inter', 'sans-serif']
+          },
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              100: '#dcfce7',
+              500: '#16a34a',
+              600: '#15803d',
+              700: '#166534',
+              accent: '#2563eb',
+              purple: '#7c3aed'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col font-sans antialiased">
+
+  <!-- TOP NAVIGATION BAR -->
+  <header class="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-sm">
+    <div class="flex items-center space-x-3 rtl:space-x-reverse">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-blue-600 flex items-center justify-center text-white shadow-md shadow-emerald-500/20">
+        <i data-lucide="building-2" class="w-6 h-6"></i>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="text-lg font-bold tracking-tight text-slate-900" data-i18n="appTitle">Property Engine</h1>
+          <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
+            Excel Live
+          </span>
+        </div>
+        <p class="text-xs text-slate-500 flex items-center gap-1">
+          <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5 text-emerald-600"></i>
+          <span id="headerWorkbookPath" class="truncate max-w-xs font-medium text-slate-700">property_engine.xlsx</span>
+          <span class="text-slate-300">•</span>
+          <span id="headerTotalRows" class="text-slate-600">Loading...</span>
+        </p>
+      </div>
+    </div>
+
+    <!-- Quick Action Controls -->
+    <div class="flex items-center space-x-2 rtl:space-x-reverse">
+      <!-- Download Updated Excel -->
+      <a href="/api/workbook/download" download="property_engine.xlsx" class="px-3.5 py-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg flex items-center gap-1.5 shadow-sm shadow-emerald-600/20 transition-all active:scale-95">
+        <i data-lucide="download" class="w-4 h-4"></i>
+        <span class="hidden sm:inline" data-i18n="downloadExcel">Download Updated Excel</span>
+        <span class="sm:hidden">.xlsx</span>
+      </a>
+
+      <!-- Upload / Replace Excel -->
+      <button id="btnUploadModal" class="px-3 py-1.5 text-xs font-medium bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-lg flex items-center gap-1.5 shadow-sm transition-all active:scale-95">
+        <i data-lucide="upload-cloud" class="w-4 h-4 text-blue-600"></i>
+        <span class="hidden sm:inline" data-i18n="uploadExcel">Upload / Replace</span>
+      </button>
+
+      <!-- Clean Orphan Rows -->
+      <button id="btnCleanOrphans" class="px-3 py-1.5 text-xs font-medium bg-white hover:bg-amber-50 text-amber-700 border border-amber-300 rounded-lg flex items-center gap-1.5 shadow-sm transition-all active:scale-95" title="Removes empty or corrupted rows without valid IDs">
+        <i data-lucide="sparkles" class="w-4 h-4 text-amber-600"></i>
+        <span class="hidden md:inline" data-i18n="cleanOrphans">Clean Orphans</span>
+      </button>
+
+      <div class="h-5 w-px bg-slate-200 mx-1"></div>
+
+      <!-- RTL / LTR Toggle -->
+      <button id="btnLangToggle" class="px-3 py-1.5 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 rounded-lg flex items-center gap-1.5 transition-all">
+        <i data-lucide="languages" class="w-4 h-4 text-purple-600"></i>
+        <span id="currentLangLabel">English</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN APP CONTAINER (SIDEBAR + CONTENT) -->
+  <div class="flex-1 flex overflow-hidden">
+    
+    <!-- SIDEBAR NAVIGATION -->
+    <aside id="sidebar" class="w-64 bg-white border-r rtl:border-r-0 rtl:border-l border-slate-200 flex flex-col justify-between transition-all duration-200 z-30 shadow-sm">
+      <div class="py-4 px-3 space-y-6 overflow-y-auto">
+        <!-- Module Navigation Links -->
+        <nav class="space-y-1">
+          <!-- 1. Overview -->
+          <button data-tab="overview" class="nav-item active w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all">
+            <i data-lucide="layout-dashboard" class="w-5 h-5 text-emerald-600"></i>
+            <span data-i18n="navOverview">Overview & Workbook</span>
+          </button>
+
+          <!-- 2. Geo-Location -->
+          <button data-tab="locations" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all">
+            <i data-lucide="map-pin" class="w-5 h-5 text-blue-600"></i>
+            <span data-i18n="navLocations">Geo-Locations</span>
+          </button>
+
+          <!-- 3. Taxonomy -->
+          <button data-tab="taxonomy" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all">
+            <i data-lucide="tag" class="w-5 h-5 text-purple-600"></i>
+            <span data-i18n="navTaxonomy">Property Taxonomy</span>
+          </button>
+
+          <!-- 4. Dynamic EAV -->
+          <button data-tab="eav" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all">
+            <i data-lucide="sliders-horizontal" class="w-5 h-5 text-amber-600"></i>
+            <span data-i18n="navEAV">Dynamic EAV Engine</span>
+          </button>
+
+          <!-- 5. Properties & Rules -->
+          <button data-tab="properties" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all">
+            <i data-lucide="building" class="w-5 h-5 text-cyan-600"></i>
+            <span data-i18n="navProperties">Properties & Rules</span>
+          </button>
+
+          <!-- 6. Bookable Units -->
+          <button data-tab="units" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all">
+            <i data-lucide="door-open" class="w-5 h-5 text-rose-600"></i>
+            <span data-i18n="navUnits">Bookable Units</span>
+          </button>
+
+          <!-- 7. Raw Sheets & i18n -->
+          <button data-tab="sheets" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all">
+            <i data-lucide="table" class="w-5 h-5 text-indigo-600"></i>
+            <span data-i18n="navSheets">Raw Sheets & i18n</span>
+          </button>
+        </nav>
+
+        <!-- Workbook Info Widget in Sidebar -->
+        <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-2">
+          <div class="flex items-center justify-between text-slate-500 font-medium">
+            <span data-i18n="sheetsLabel">Total Sheets</span>
+            <span class="font-bold text-slate-800">17</span>
+          </div>
+          <div class="flex items-center justify-between text-slate-500 font-medium">
+            <span data-i18n="recordsLabel">Total Records</span>
+            <span id="sidebarTotalRecords" class="font-bold text-emerald-700">...</span>
+          </div>
+          <div class="flex items-center justify-between text-slate-500 font-medium">
+            <span data-i18n="concurrencyLabel">Mutex Guard</span>
+            <span class="text-xs text-emerald-700 font-semibold flex items-center gap-1">
+              <i data-lucide="lock" class="w-3 h-3 text-emerald-600"></i> Active
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sidebar Footer -->
+      <div class="p-3 border-t border-slate-200 text-center text-xs text-slate-500 font-medium">
+        Property Engine v2.0 • In-Memory ExcelDB
+      </div>
+    </aside>
+
+    <!-- MAIN VIEW AREA -->
+    <main id="mainContent" class="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-50/70">
+      
+      <!-- TAB 1: OVERVIEW & WORKBOOK MANAGER -->
+      <section id="tab-overview" class="tab-pane active space-y-6">
+        <!-- Hero Banner -->
+        <div class="relative overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-50 via-white to-slate-50 border border-slate-200 p-6 shadow-sm">
+          <div class="relative z-10 max-w-3xl space-y-2">
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-800 text-xs font-semibold">
+              <i data-lucide="shield-check" class="w-4 h-4 text-emerald-600"></i>
+              <span>Zero-Database Architecture • Direct Excel Persistence</span>
+            </div>
+            <h2 class="text-2xl font-bold text-slate-900 tracking-tight" data-i18n="overviewHeroTitle">Property Engine Excel Simulation System</h2>
+            <p class="text-sm text-slate-600 leading-relaxed" data-i18n="overviewHeroDesc">
+              Simulating relational database operations, foreign key cascades, polymorphic translations, and dynamic EAV specification engines directly on <code class="px-1.5 py-0.5 rounded bg-slate-100 text-emerald-700 border border-slate-200 font-mono text-xs font-semibold">property_engine.xlsx</code>.
+            </p>
+          </div>
+          <div class="absolute -right-10 -bottom-10 opacity-5 text-emerald-800 pointer-events-none">
+            <i data-lucide="layers" class="w-64 h-64"></i>
+          </div>
+        </div>
+
+        <!-- Metric Cards Grid -->
+        <div id="overviewMetricsGrid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <!-- Dynamically populated -->
+        </div>
+
+        <!-- Subsystems Architecture Map -->
+        <div class="grid grid-cols-1 lg:grid-cols-5 gap-4">
+          <!-- 1. Geo -->
+          <div class="bg-white border border-slate-200 rounded-xl p-4 space-y-3 shadow-sm hover:shadow-md transition-shadow">
+            <div class="flex items-center justify-between">
+              <div class="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
+                <i data-lucide="map-pin" class="w-4 h-4"></i>
+              </div>
+              <span class="text-xs text-slate-500 font-mono font-medium">3 Sheets</span>
+            </div>
+            <div>
+              <h3 class="text-sm font-bold text-slate-900">1. Geographic Hierarchy</h3>
+              <p class="text-xs text-slate-500 mt-1">Country → City → District</p>
+            </div>
+            <button onclick="app.switchTab('locations')" class="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1 font-semibold">
+              Explore Geo <i data-lucide="arrow-right" class="w-3 h-3 rtl:rotate-180"></i>
+            </button>
+          </div>
+
+          <!-- 2. Taxonomy -->
+          <div class="bg-white border border-slate-200 rounded-xl p-4 space-y-3 shadow-sm hover:shadow-md transition-shadow">
+            <div class="flex items-center justify-between">
+              <div class="w-8 h-8 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center">
+                <i data-lucide="tag" class="w-4 h-4"></i>
+              </div>
+              <span class="text-xs text-slate-500 font-mono font-medium">3 Sheets</span>
+            </div>
+            <div>
+              <h3 class="text-sm font-bold text-slate-900">2. Property Taxonomy</h3>
+              <p class="text-xs text-slate-500 mt-1">Type & Classifications Matrix</p>
+            </div>
+            <button onclick="app.switchTab('taxonomy')" class="text-xs text-purple-600 hover:text-purple-700 flex items-center gap-1 font-semibold">
+              View Matrix <i data-lucide="arrow-right" class="w-3 h-3 rtl:rotate-180"></i>
+            </button>
+          </div>
+
+          <!-- 3. Core Properties -->
+          <div class="bg-white border border-slate-200 rounded-xl p-4 space-y-3 shadow-sm hover:shadow-md transition-shadow">
+            <div class="flex items-center justify-between">
+              <div class="w-8 h-8 rounded-lg bg-cyan-100 text-cyan-700 flex items-center justify-center">
+                <i data-lucide="building" class="w-4 h-4"></i>
+              </div>
+              <span class="text-xs text-slate-500 font-mono font-medium">4 Sheets</span>
+            </div>
+            <div>
+              <h3 class="text-sm font-bold text-slate-900">3. Inventory & Rules</h3>
+              <p class="text-xs text-slate-500 mt-1">Property, Rules, Units</p>
+            </div>
+            <button onclick="app.switchTab('properties')" class="text-xs text-cyan-600 hover:text-cyan-700 flex items-center gap-1 font-semibold">
+              Manage Properties <i data-lucide="arrow-right" class="w-3 h-3 rtl:rotate-180"></i>
+            </button>
+          </div>
+
+          <!-- 4. Dynamic EAV -->
+          <div class="bg-white border border-slate-200 rounded-xl p-4 space-y-3 shadow-sm hover:shadow-md transition-shadow">
+            <div class="flex items-center justify-between">
+              <div class="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center">
+                <i data-lucide="sliders-horizontal" class="w-4 h-4"></i>
+              </div>
+              <span class="text-xs text-slate-500 font-mono font-medium">5 Sheets</span>
+            </div>
+            <div>
+              <h3 class="text-sm font-bold text-slate-900">4. Dynamic EAV Engine</h3>
+              <p class="text-xs text-slate-500 mt-1">Definitions, Options, Values</p>
+            </div>
+            <button onclick="app.switchTab('eav')" class="text-xs text-amber-600 hover:text-amber-700 flex items-center gap-1 font-semibold">
+              EAV Builder <i data-lucide="arrow-right" class="w-3 h-3 rtl:rotate-180"></i>
+            </button>
+          </div>
+
+          <!-- 5. i18n -->
+          <div class="bg-white border border-slate-200 rounded-xl p-4 space-y-3 shadow-sm hover:shadow-md transition-shadow">
+            <div class="flex items-center justify-between">
+              <div class="w-8 h-8 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center">
+                <i data-lucide="globe" class="w-4 h-4"></i>
+              </div>
+              <span class="text-xs text-slate-500 font-mono font-medium">2 Sheets</span>
+            </div>
+            <div>
+              <h3 class="text-sm font-bold text-slate-900">5. Polymorphic i18n</h3>
+              <p class="text-xs text-slate-500 mt-1">Languages & Translations</p>
+            </div>
+            <button onclick="app.switchTab('sheets', 'Translation')" class="text-xs text-rose-600 hover:text-rose-700 flex items-center gap-1 font-semibold">
+              Translations Matrix <i data-lucide="arrow-right" class="w-3 h-3 rtl:rotate-180"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- 17 Sheets Explorer Cards -->
+        <div class="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-sm">
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-base font-bold text-slate-900" data-i18n="sheetsCardTitle">All 17 Workbook Sheets</h3>
+              <p class="text-xs text-slate-500" data-i18n="sheetsCardSub">Click any sheet to jump to its raw data table or management module</p>
+            </div>
+            <button onclick="app.refreshAll()" class="px-3 py-1.5 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg flex items-center gap-1.5 transition-colors">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+              <span data-i18n="refresh">Refresh Stats</span>
+            </button>
+          </div>
+          <div id="allSheetsGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            <!-- Populated via app.js -->
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: GEO-LOCATION MANAGER -->
+      <section id="tab-locations" class="tab-pane space-y-6">
+        <!-- Header -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 class="text-xl font-bold text-slate-900 tracking-tight" data-i18n="geoTitle">Geographic Hierarchy Manager</h2>
+            <p class="text-xs text-slate-500" data-i18n="geoSubtitle">Cascading management for Countries, Cities, and Districts with localized Arabic/English names</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="app.openGeoModal('Country')" class="px-3.5 py-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-1.5 shadow-sm shadow-blue-600/20">
+              <i data-lucide="plus" class="w-4 h-4"></i> <span data-i18n="addCountry">Add Country</span>
+            </button>
+            <button onclick="app.openGeoModal('City')" class="px-3 py-1.5 text-xs font-semibold bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-lg flex items-center gap-1.5 shadow-sm">
+              <i data-lucide="plus" class="w-4 h-4"></i> <span data-i18n="addCity">Add City</span>
+            </button>
+            <button onclick="app.openGeoModal('District')" class="px-3 py-1.5 text-xs font-semibold bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-lg flex items-center gap-1.5 shadow-sm">
+              <i data-lucide="plus" class="w-4 h-4"></i> <span data-i18n="addDistrict">Add District</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 3-Column Cascading Master-Detail View -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <!-- Col 1: Countries -->
+          <div class="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col h-[650px] shadow-sm">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-200">
+              <div class="flex items-center gap-2">
+                <i data-lucide="globe" class="w-4 h-4 text-blue-600"></i>
+                <h3 class="text-sm font-bold text-slate-900" data-i18n="countries">Countries</h3>
+                <span id="countryCountBadge" class="px-2 py-0.5 text-xs font-semibold rounded-full bg-slate-100 text-slate-700">0</span>
+              </div>
+            </div>
+            <div class="mt-2 mb-2">
+              <input type="text" id="countrySearch" placeholder="Search countries..." class="w-full px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div id="countryList" class="flex-1 overflow-y-auto space-y-1.5 pr-1">
+              <!-- Country items -->
+            </div>
+          </div>
+
+          <!-- Col 2: Cities -->
+          <div class="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col h-[650px] shadow-sm">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-200">
+              <div class="flex items-center gap-2">
+                <i data-lucide="building" class="w-4 h-4 text-emerald-600"></i>
+                <h3 class="text-sm font-bold text-slate-900" data-i18n="cities">Cities</h3>
+                <span id="cityCountBadge" class="px-2 py-0.5 text-xs font-semibold rounded-full bg-slate-100 text-slate-700">0</span>
+              </div>
+              <span id="selectedCountryName" class="text-xs text-blue-600 font-semibold truncate max-w-[120px]">All Countries</span>
+            </div>
+            <div class="mt-2 mb-2">
+              <input type="text" id="citySearch" placeholder="Search cities..." class="w-full px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+            </div>
+            <div id="cityList" class="flex-1 overflow-y-auto space-y-1.5 pr-1">
+              <!-- City items -->
+            </div>
+          </div>
+
+          <!-- Col 3: Districts -->
+          <div class="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col h-[650px] shadow-sm">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-200">
+              <div class="flex items-center gap-2">
+                <i data-lucide="map-pin" class="w-4 h-4 text-purple-600"></i>
+                <h3 class="text-sm font-bold text-slate-900" data-i18n="districts">Districts</h3>
+                <span id="districtCountBadge" class="px-2 py-0.5 text-xs font-semibold rounded-full bg-slate-100 text-slate-700">0</span>
+              </div>
+              <span id="selectedCityName" class="text-xs text-emerald-600 font-semibold truncate max-w-[120px]">All Cities</span>
+            </div>
+            <div class="mt-2 mb-2">
+              <input type="text" id="districtSearch" placeholder="Search districts..." class="w-full px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500">
+            </div>
+            <div id="districtList" class="flex-1 overflow-y-auto space-y-1.5 pr-1">
+              <!-- District items -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3: PROPERTY TAXONOMY & MATRIX -->
+      <section id="tab-taxonomy" class="tab-pane space-y-6">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 class="text-xl font-bold text-slate-900 tracking-tight" data-i18n="taxonomyTitle">Property Taxonomy & Combination Matrix</h2>
+            <p class="text-xs text-slate-500" data-i18n="taxonomySubtitle">Define structural types, quality tiers, and toggle valid combinations with one click</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="app.openTaxonomyModal('PropertyType')" class="px-3.5 py-1.5 text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white rounded-lg flex items-center gap-1.5 shadow-sm shadow-purple-600/20">
+              <i data-lucide="plus" class="w-4 h-4"></i> <span data-i18n="addPropertyType">Add Property Type</span>
+            </button>
+            <button onclick="app.openTaxonomyModal('PropertyClassification')" class="px-3 py-1.5 text-xs font-medium bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-lg flex items-center gap-1.5 shadow-sm">
+              <i data-lucide="plus" class="w-4 h-4"></i> <span data-i18n="addClassification">Add Classification</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Interactive Combination Matrix Grid -->
+        <div class="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-sm">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <i data-lucide="grid" class="w-5 h-5 text-purple-600"></i>
+              <div>
+                <h3 class="text-base font-bold text-slate-900" data-i18n="matrixTitle">Type-Classification Pairing Matrix</h3>
+                <p class="text-xs text-slate-500" data-i18n="matrixDesc">Click any checkbox to immediately enable or disable an allowed combination in PropertyTypeClassification</p>
+              </div>
+            </div>
+            <span class="text-xs px-2.5 py-1 rounded-full bg-purple-100 text-purple-800 border border-purple-200 font-semibold">
+              Live Auto-Sync
+            </span>
+          </div>
+          
+          <div class="overflow-x-auto">
+            <table id="taxonomyMatrixTable" class="w-full text-left rtl:text-right border-collapse text-xs">
+              <!-- Dynamically populated matrix -->
+            </table>
+          </div>
+        </div>
+
+        <!-- Separate Lists for PropertyType and PropertyClassification -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Property Types -->
+          <div class="bg-white border border-slate-200 rounded-2xl p-5 space-y-3 shadow-sm">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-200">
+              <div class="flex items-center gap-2">
+                <i data-lucide="home" class="w-4 h-4 text-blue-600"></i>
+                <h3 class="text-sm font-bold text-slate-900">Property Types</h3>
+              </div>
+            </div>
+            <div id="propertyTypeList" class="space-y-2"></div>
+          </div>
+
+          <!-- Classifications -->
+          <div class="bg-white border border-slate-200 rounded-2xl p-5 space-y-3 shadow-sm">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-200">
+              <div class="flex items-center gap-2">
+                <i data-lucide="award" class="w-4 h-4 text-amber-600"></i>
+                <h3 class="text-sm font-bold text-slate-900">Property Classifications</h3>
+              </div>
+            </div>
+            <div id="classificationList" class="space-y-2"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 4: DYNAMIC EAV ENGINE BUILDER -->
+      <section id="tab-eav" class="tab-pane space-y-6">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 class="text-xl font-bold text-slate-900 tracking-tight" data-i18n="eavTitle">Dynamic EAV Specification Engine</h2>
+            <p class="text-xs text-slate-500" data-i18n="eavSubtitle">Manage Attribute Groups, Definitions, ENUM Options, and map attributes to Unit Types</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="app.openAttributeGroupModal()" class="px-3 py-1.5 text-xs font-semibold bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-lg flex items-center gap-1.5 shadow-sm">
+              <i data-lucide="folder-plus" class="w-4 h-4 text-amber-600"></i> <span>Add Group</span>
+            </button>
+            <button onclick="app.openAttributeDefModal()" class="px-3.5 py-1.5 text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white rounded-lg flex items-center gap-1.5 shadow-sm shadow-amber-600/20">
+              <i data-lucide="plus" class="w-4 h-4"></i> <span>Add Attribute Definition</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Sub-tabs for EAV: Definitions & Unit Type Mapper -->
+        <div class="flex items-center gap-2 border-b border-slate-200 pb-2">
+          <button id="subtab-btn-defs" onclick="app.switchEavSubTab('defs')" class="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-amber-100 text-amber-800 border border-amber-300 shadow-sm">
+            Attribute Catalog & ENUM Options
+          </button>
+          <button id="subtab-btn-mapper" onclick="app.switchEavSubTab('mapper')" class="px-3.5 py-1.5 text-xs font-medium rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100">
+            Unit Type Attribute Mapper
+          </button>
+        </div>
+
+        <!-- EAV Subtab 1: Attribute Catalog -->
+        <div id="eav-subtab-defs" class="space-y-4">
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <!-- Left: Groups List -->
+            <div class="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 shadow-sm">
+              <div class="flex items-center justify-between pb-2 border-b border-slate-200">
+                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500">Attribute Groups</h3>
+                <button onclick="app.openAttributeGroupModal()" class="text-xs text-amber-600 hover:text-amber-700 font-semibold">+ New</button>
+              </div>
+              <div id="eavGroupsList" class="space-y-1">
+                <!-- Group filters -->
+              </div>
+            </div>
+
+            <!-- Right: Definitions Table -->
+            <div class="md:col-span-3 bg-white border border-slate-200 rounded-2xl p-5 space-y-3 shadow-sm">
+              <div class="flex items-center justify-between pb-2 border-b border-slate-200">
+                <div class="flex items-center gap-2">
+                  <i data-lucide="sliders" class="w-4 h-4 text-amber-600"></i>
+                  <h3 class="text-sm font-bold text-slate-900">Attribute Definitions</h3>
+                </div>
+                <input type="text" id="attrDefSearch" placeholder="Filter definitions..." class="px-3 py-1 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500">
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full text-left rtl:text-right border-collapse text-xs">
+                  <thead>
+                    <tr class="border-b border-slate-200 text-slate-500 bg-slate-50/70">
+                      <th class="py-2.5 px-3">Key / Icon</th>
+                      <th class="py-2.5 px-3">Value Type</th>
+                      <th class="py-2.5 px-3">Group</th>
+                      <th class="py-2.5 px-3">Unit</th>
+                      <th class="py-2.5 px-3">Flags</th>
+                      <th class="py-2.5 px-3">ENUM Options</th>
+                      <th class="py-2.5 px-3 text-right rtl:text-left">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="attrDefTableBody" class="divide-y divide-slate-100">
+                    <!-- Definitions rows -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- EAV Subtab 2: Unit Type Attribute Mapper -->
+        <div id="eav-subtab-mapper" class="hidden space-y-4">
+          <div class="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-sm">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
+              <div>
+                <h3 class="text-base font-bold text-slate-900">Unit Type Attribute Schema Configuration</h3>
+                <p class="text-xs text-slate-500">Select a Unit Type to configure which attributes apply to it, with requirement and filterability overrides</p>
+              </div>
+              <div class="flex items-center gap-3">
+                <label class="text-xs text-slate-600 font-semibold">Select Unit Type:</label>
+                <select id="mapperUnitTypeSelect" onchange="app.loadUnitTypeMapper()" class="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-amber-500">
+                  <!-- Populated via app.js -->
+                </select>
+                <button onclick="app.saveUnitTypeMapper()" class="px-4 py-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg flex items-center gap-1.5 shadow-sm">
+                  <i data-lucide="save" class="w-4 h-4"></i> Save Mapping
+                </button>
+              </div>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-left rtl:text-right border-collapse text-xs">
+                <thead>
+                  <tr class="border-b border-slate-200 text-slate-500 bg-slate-50/70">
+                    <th class="py-2.5 px-3">Assigned</th>
+                    <th class="py-2.5 px-3">Attribute Key</th>
+                    <th class="py-2.5 px-3">Value Type</th>
+                    <th class="py-2.5 px-3">Group</th>
+                    <th class="py-2.5 px-3 text-center">Required (Override)</th>
+                    <th class="py-2.5 px-3 text-center">Filterable (Override)</th>
+                    <th class="py-2.5 px-3 text-center">Displayable</th>
+                    <th class="py-2.5 px-3">Sort Order</th>
+                  </tr>
+                </thead>
+                <tbody id="unitTypeMapperTableBody" class="divide-y divide-slate-100">
+                  <!-- Dynamically mapped attributes -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 5: PROPERTIES & RULES MANAGER -->
+      <section id="tab-properties" class="tab-pane space-y-6">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 class="text-xl font-bold text-slate-900 tracking-tight" data-i18n="propTitle">Properties & House Rules Manager</h2>
+            <p class="text-xs text-slate-500" data-i18n="propSubtitle">Manage real-estate properties, physical addresses, GPS coordinates, multi-lingual details, and policies</p>
+          </div>
+          <button onclick="app.openPropertyModal()" class="px-3.5 py-1.5 text-xs font-semibold bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg flex items-center gap-1.5 shadow-sm shadow-cyan-600/20">
+            <i data-lucide="plus" class="w-4 h-4"></i> <span data-i18n="addProperty">Add New Property</span>
+          </button>
+        </div>
+
+        <!-- Filter bar -->
+        <div class="flex flex-wrap items-center gap-3 p-3 bg-white border border-slate-200 rounded-xl text-xs shadow-sm">
+          <input type="text" id="propertySearch" placeholder="Search by name, address, landmark..." class="flex-1 min-w-[200px] px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500">
+          <select id="propertyStatusFilter" class="px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-700 focus:outline-none">
+            <option value="">All Statuses</option>
+            <option value="ACTIVE">ACTIVE</option>
+            <option value="PENDING">PENDING</option>
+            <option value="MAINTENANCE">MAINTENANCE</option>
+            <option value="INACTIVE">INACTIVE</option>
+            <option value="REJECTED">REJECTED</option>
+          </select>
+          <select id="propertyTypeFilter" class="px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-700 focus:outline-none">
+            <option value="">All Types</option>
+          </select>
+        </div>
+
+        <!-- Properties Grid -->
+        <div id="propertiesGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Populated via app.js -->
+        </div>
+      </section>
+
+      <!-- TAB 6: BOOKABLE UNITS & DYNAMIC ATTRIBUTES -->
+      <section id="tab-units" class="tab-pane space-y-6">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 class="text-xl font-bold text-slate-900 tracking-tight" data-i18n="unitsTitle">Bookable Units & Dynamic Attribute Engine</h2>
+            <p class="text-xs text-slate-500" data-i18n="unitsSubtitle">Individual inventory units with typed EAV values, pricing, capacity, and live filterAttributes JSON sync</p>
+          </div>
+          <button onclick="app.openUnitModal()" class="px-3.5 py-1.5 text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white rounded-lg flex items-center gap-1.5 shadow-sm shadow-rose-600/20">
+            <i data-lucide="plus" class="w-4 h-4"></i> <span data-i18n="addUnit">Add Bookable Unit</span>
+          </button>
+        </div>
+
+        <!-- Filter bar -->
+        <div class="flex flex-wrap items-center gap-3 p-3 bg-white border border-slate-200 rounded-xl text-xs shadow-sm">
+          <input type="text" id="unitSearch" placeholder="Search by unit name..." class="flex-1 min-w-[200px] px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-500">
+          <select id="unitPropertyFilter" class="px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-700 focus:outline-none">
+            <option value="">All Properties</option>
+          </select>
+          <select id="unitTypeFilter" class="px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-700 focus:outline-none">
+            <option value="">All Unit Types</option>
+          </select>
+        </div>
+
+        <!-- Units Table -->
+        <div class="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-sm">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left rtl:text-right border-collapse text-xs">
+              <thead>
+                <tr class="border-b border-slate-200 text-slate-500 bg-slate-50/70">
+                  <th class="py-2.5 px-3">Unit Name</th>
+                  <th class="py-2.5 px-3">Property</th>
+                  <th class="py-2.5 px-3">Type</th>
+                  <th class="py-2.5 px-3">Capacity</th>
+                  <th class="py-2.5 px-3">Pricing</th>
+                  <th class="py-2.5 px-3">Status</th>
+                  <th class="py-2.5 px-3">Filter Attributes (JSON Sync)</th>
+                  <th class="py-2.5 px-3 text-right rtl:text-left">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="unitsTableBody" class="divide-y divide-slate-100">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 7: RAW SHEET EXPLORER & LOCALIZATION MATRIX -->
+      <section id="tab-sheets" class="tab-pane space-y-6">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 class="text-xl font-bold text-slate-900 tracking-tight" data-i18n="rawTitle">Raw Workbook Explorer & Localization Matrix</h2>
+            <p class="text-xs text-slate-500" data-i18n="rawSubtitle">Direct access to all 17 Excel sheets, foreign key labels, and central Translation dictionary</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="app.openAddRawRowModal()" class="px-3.5 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg flex items-center gap-1.5 shadow-sm shadow-indigo-600/20">
+              <i data-lucide="plus" class="w-4 h-4"></i> <span data-i18n="addRow">Add Row to Active Sheet</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Sheet Selector Tabs -->
+        <div class="flex flex-wrap gap-1.5 border-b border-slate-200 pb-2">
+          <!-- 17 sheet pills dynamically rendered -->
+          <div id="rawSheetPills" class="flex flex-wrap gap-1.5"></div>
+        </div>
+
+        <!-- Active Raw Sheet Table -->
+        <div class="bg-white border border-slate-200 rounded-2xl p-5 space-y-3 shadow-sm">
+          <div class="flex items-center justify-between pb-2 border-b border-slate-200">
+            <div class="flex items-center gap-2">
+              <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
+              <h3 id="rawCurrentSheetName" class="text-sm font-bold text-slate-900">Sheet</h3>
+              <span id="rawCurrentRowCount" class="text-xs px-2.5 py-0.5 font-semibold rounded-full bg-slate-100 text-slate-700">0 rows</span>
+            </div>
+            <input type="text" id="rawSearchInput" placeholder="Filter rows in sheet..." class="px-3 py-1 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          </div>
+          <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
+            <table id="rawDataTable" class="w-full text-left rtl:text-right border-collapse text-xs font-mono">
+              <!-- Dynamically rendered raw sheet rows -->
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- MODALS CONTAINER -->
+  <div id="modalContainer" class="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm hidden items-center justify-center p-4">
+    <!-- Dynamic Modal Content rendered here -->
+  </div>
+
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div id="toastContainer" class="fixed bottom-4 right-4 rtl:right-auto rtl:left-4 z-50 space-y-2 pointer-events-none"></div>
+
+  <!-- Scripts -->
+  <script src="app.js"></script>
+</body>
+</html>
