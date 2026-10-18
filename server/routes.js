@@ -22,7 +22,8 @@ router.get('/workbook/stats', asyncHandler(async (req, res) => {
 }));
 
 router.get('/workbook/download', (req, res) => {
-  res.download(WORKBOOK_PATH, 'property_engine.xlsx', err => {
+  const downloadPath = (typeof db.getWorkbookPath === 'function') ? db.getWorkbookPath() : WORKBOOK_PATH;
+  res.download(downloadPath, 'property_engine.xlsx', err => {
     if (err) {
       console.error('[Download Error]:', err);
       if (!res.headersSent) res.status(500).json({ error: 'Download failed' });

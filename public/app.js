@@ -219,7 +219,14 @@ class DashboardApp {
   async fetchAPI(url, options = {}) {
     try {
       const res = await fetch(url, options);
-      const data = await res.json();
+      const contentType = res.headers.get('content-type') || '';
+      let data;
+      if (contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        throw new Error(`Server returned ${res.status} (${res.statusText || 'Non-JSON response'}): ${text.slice(0, 100)}`);
+      }
       if (!res.ok || data.success === false) {
         throw new Error(data.error || 'Request failed');
       }

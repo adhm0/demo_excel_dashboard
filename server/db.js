@@ -4,8 +4,29 @@ const crypto = require('crypto');
 const ExcelJS = require('exceljs');
 const { Mutex } = require('async-mutex');
 
-const WORKBOOK_PATH = path.resolve(__dirname, '..', 'property_engine.xlsx');
-const BACKUP_PATH = path.resolve(__dirname, '..', 'property_engine.backup.xlsx');
+const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NOW_REGION);
+
+function resolveOriginalWorkbookPath() {
+  const candidates = [
+    path.resolve(__dirname, '..', 'property_engine.xlsx'),
+    path.resolve(process.cwd(), 'property_engine.xlsx'),
+    path.resolve(process.cwd(), 'server', 'property_engine.xlsx'),
+    path.resolve(__dirname, 'property_engine.xlsx')
+  ];
+  for (const p of candidates) {
+    if (fs.existsSync(p)) return p;
+  }
+  return path.resolve(__dirname, '..', 'property_engine.xlsx');
+}
+
+let activeWorkbookPath = resolveOriginalWorkbookPath();
+let activeBackupPath = path.resolve(path.dirname(activeWorkbookPath), 'property_engine.backup.xlsx');
+
+if (isServerless) {
+  activeWorkbookPath = path.join('/tmp', 'property_engine.xlsx');
+  activeBackupPath = path.join('/tmp', 'property_engine.backup.xlsx');
+}
+
 
 // 17 Sheets in exact order
 const SHEETS = [
@@ -85,10 +106,10 @@ class ExcelDatabase {
     return this.mutex.runExclusive(async () => {
       await this._loadWorkbook();
       // Create backup on first launch if not exists
-      if (!fs.existsSync(BACKUP_PATH) && fs.existsSync(WORKBOOK_PATH)) {
+      if (!fs.existsSync(activeBackupPath) && fs.existsSync(activeWorkbookPath)) {
         try {
-          fs.copyFileSync(WORKBOOK_PATH, BACKUP_PATH);
-          console.log(`[ExcelDB] Initial backup created at ${BACKUP_PATH}`);
+          fs.copyFileSync(activeWorkbookPath, activeBackupPath);
+          console.log(`[ExcelDB] Initial backup created at ${activeBackupPath}`);
         } catch (err) {
           console.warn('[ExcelDB] Could not create initial backup:', err.message);
         }
@@ -160,21 +181,55 @@ class ExcelDatabase {
   }
 
   async _loadWorkbook() {
-    if (!fs.existsSync(WORKBOOK_PATH)) {
-      throw new Error(`Workbook not found at ${WORKBOOK_PATH}`);
+    if (isServerless && !fs.existsSync(activeWorkbookPath)) {
+      const orig = resolveOriginalWorkbookPath();
+      if (fs.existsSync(orig)) {
+        try {
+          fs.copyFileSync(orig, activeWorkbookPath);
+          console.log(`[ExcelDB] Copied workbook from ${orig} to writable /tmp (${activeWorkbookPath})`);
+        } catch (copyErr) {
+          console.error('[ExcelDB] Could not copy workbook to /tmp:', copyErr);
+        }
+      } else {
+        console.warn(`[ExcelDB] Original workbook file not found at ${orig}`);
+      }
     }
+
+    let targetPath = activeWorkbookPath;
+    if (!fs.existsSync(targetPath)) {
+      const orig = resolveOriginalWorkbookPath();
+      if (fs.existsSync(orig)) {
+        targetPath = orig;
+      } else {
+        throw new Error(`Workbook not found at ${targetPath} (nor at original path: ${orig})`);
+      }
+    }
+
     const wb = new ExcelJS.Workbook();
-    await wb.xlsx.readFile(WORKBOOK_PATH);
+    await wb.xlsx.readFile(targetPath);
     this.workbook = wb;
-    const stats = fs.statSync(WORKBOOK_PATH);
-    this.lastModified = stats.mtime;
-    console.log(`[ExcelDB] Workbook loaded successfully (${wb.worksheets.length} sheets).`);
+    try {
+      const stats = fs.statSync(targetPath);
+      this.lastModified = stats.mtime;
+    } catch {
+      this.lastModified = new Date();
+    }
+    console.log(`[ExcelDB] Workbook loaded successfully (${wb.worksheets.length} sheets) from ${targetPath}.`);
   }
 
   async _saveWorkbook() {
-    await this.workbook.xlsx.writeFile(WORKBOOK_PATH);
-    const stats = fs.statSync(WORKBOOK_PATH);
-    this.lastModified = stats.mtime;
+    try {
+      await this.workbook.xlsx.writeFile(activeWorkbookPath);
+      const stats = fs.statSync(activeWorkbookPath);
+      this.lastModified = stats.mtime;
+    } catch (err) {
+      if (err.code === 'EROFS') {
+        console.warn('[ExcelDB] Read-only filesystem detected, state preserved in-memory:', err.message);
+        this.lastModified = new Date();
+      } else {
+        throw err;
+      }
+    }
   }
 
   // Generate UUID according to 018f3a3a-<PREFIX>-7000-8000-<12-digit-hex>
@@ -327,7 +382,7 @@ class ExcelDatabase {
         totalSheets: SHEETS.length,
         totalRows,
         lastModified: this.lastModified,
-        filePath: WORKBOOK_PATH
+        filePath: activeWorkbookPath
       };
     });
   }
@@ -802,10 +857,26 @@ class ExcelDatabase {
   async replaceWorkbook(buffer) {
     return this.mutex.runExclusive(async () => {
       // Backup current file before replacement
-      if (fs.existsSync(WORKBOOK_PATH)) {
-        fs.copyFileSync(WORKBOOK_PATH, BACKUP_PATH);
+      try {
+        if (fs.existsSync(activeWorkbookPath)) {
+          fs.copyFileSync(activeWorkbookPath, activeBackupPath);
+        }
+      } catch (err) {
+        console.warn('[ExcelDB] Backup copy failed before replacement:', err.message);
       }
-      fs.writeFileSync(WORKBOOK_PATH, buffer);
+      try {
+        fs.writeFileSync(activeWorkbookPath, buffer);
+      } catch (err) {
+        if (err.code === 'EROFS') {
+          console.warn('[ExcelDB] Read-only filesystem, loading buffer directly into workbook');
+          const wb = new ExcelJS.Workbook();
+          await wb.xlsx.load(buffer);
+          this.workbook = wb;
+          this.lastModified = new Date();
+          return { success: true, message: 'Workbook loaded into memory (read-only filesystem).' };
+        }
+        throw err;
+      }
       await this._loadWorkbook();
       return { success: true, message: 'Workbook successfully replaced and reloaded.' };
     });
@@ -1032,7 +1103,11 @@ class ExcelDatabase {
 
 module.exports = {
   db: new ExcelDatabase(),
+  ExcelDatabase,
   SHEETS,
   SHEET_COLUMNS,
-  WORKBOOK_PATH
+  PREFIX_MAP,
+  WORKBOOK_PATH: activeWorkbookPath,
+  BACKUP_PATH: activeBackupPath,
+  getWorkbookPath: () => activeWorkbookPath
 };
