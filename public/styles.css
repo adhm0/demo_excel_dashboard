@@ -1,6 +1,8 @@
-/* Custom CSS for Property Engine Dashboard - Light Mode Only */
+/* Custom CSS for Property Engine Dashboard */
 
-/* Custom Scrollbars */
+/* ============================================
+   SCROLLBAR STYLES
+   ============================================ */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -19,7 +21,9 @@
   background: #94a3b8;
 }
 
-/* Nav Item States */
+/* ============================================
+   NAVIGATION ITEM STATES
+   ============================================ */
 .nav-item {
   color: #64748b;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -37,64 +41,158 @@
   font-weight: 600;
 }
 
-/* Tab Panes */
+/* ============================================
+   TAB PANES
+   ============================================ */
 .tab-pane {
   display: none;
   animation: fadeIn 0.2s ease-out;
 }
 
 .tab-pane.active {
-  display: block;
+  display: block !important;
 }
 
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-/* Modal Animations */
-.modal-enter {
-  animation: modalIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-@keyframes modalIn {
-  from {
-    opacity: 0;
-    transform: scale(0.97) translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
-}
-
-/* RTL Adjustments */
-[dir="rtl"] {
-  font-family: 'Cairo', 'Inter', sans-serif;
-}
-
-[dir="rtl"] .nav-item.active {
-  border-inline-start: 3px solid #16a34a;
-}
-
-/* Toast Animation */
+/* ============================================
+   TOAST ANIMATION
+   ============================================ */
 .toast-slide-in {
   animation: toastIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes toastIn {
-  from {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ============================================
+   MODAL STYLES
+   ============================================ */
+#modalContainer > div {
+  max-width: calc(100vw - 1.5rem);
+  max-height: calc(100vh - 2rem);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+#modalContainer form {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ============================================
+   TABLE SCROLLING
+   ============================================ */
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+}
+
+table {
+  min-width: 100%;
+}
+
+/* ============================================
+   MAIN CONTENT SCROLL (desktop only)
+   ============================================ */
+@media (min-width: 1024px) {
+  #mainContent {
+    overflow-y: auto;
+  }
+}
+
+/* ============================================
+   SIDEBAR MOBILE DRAWER
+   ============================================ */
+@media (max-width: 1023px) {
+  #sidebar {
+    position: fixed;
+    top: 56px;
+    bottom: 0;
+    left: 0;
+    width: 280px;
+    max-width: 85vw;
+    z-index: 40;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+    will-change: transform;
+  }
+
+  /* Default closed state - hidden off-screen LEFT for LTR */
+  #sidebar {
+    transform: translateX(-100%);
+  }
+
+  /* RTL override - hidden off-screen RIGHT */
+  [dir="rtl"] #sidebar {
+    right: 0;
+    left: auto;
+    transform: translateX(100%);
+  }
+
+  /* Open state - slide into view regardless of direction */
+  #sidebar.open {
+    transform: translateX(0) !important;
+  }
+
+  /* Backdrop visibility */
+  #sidebarBackdrop {
     opacity: 0;
-    transform: translateY(16px);
+    pointer-events: none;
+    transition: opacity 0.2s ease;
   }
-  to {
+
+  #sidebarBackdrop.open {
     opacity: 1;
-    transform: translateY(0);
+    pointer-events: auto;
   }
+}
+
+/* Desktop sidebar - always visible, no transforms */
+@media (min-width: 1024px) {
+  #sidebar {
+    position: relative !important;
+    transform: none !important;
+    inset: auto !important;
+    box-shadow: none !important;
+    border-right-style: solid;
+    border-left-style: none;
+  }
+
+  [dir="rtl"] #sidebar {
+    border-right-style: none;
+    border-left-style: solid;
+  }
+}
+
+/* ============================================
+   RTL ADJUSTMENTS
+   ============================================ */
+[dir="rtl"] .nav-item.active {
+  border-inline-start: 3px solid #16a34a;
+}
+
+[dir="rtl"] {
+  font-family: 'Cairo', 'Inter', sans-serif;
+}
+
+/* ============================================
+   ACCESSIBILITY / UTILITIES
+   ============================================ */
+*:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+::selection {
+  background-color: #bfdbfe;
+  color: #1e40af;
 }

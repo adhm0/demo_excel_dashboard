@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
   <title>Property Engine - Simulation Dashboard</title>
   
   <!-- Google Fonts: Inter & Cairo -->
@@ -39,118 +39,220 @@
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
 
+  <!-- Critical inline styles - prevent FOUC and fix RTL issues -->
+  <style>
+    /* Prevent flash of empty content */
+    body, main { background-color: #f8fafc !important; }
+    
+    /* Fix flex layout immediately */
+    .app-layout-container { min-height: calc(100vh - 56px); }
+    
+    /* Sidebar mobile drawer - starts CLOSED */
+    #sidebar {
+      top: 56px;
+      bottom: 0;
+      width: 280px;
+      will-change: transform;
+      transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    /* Default closed state - hidden off-screen LEFT */
+    #sidebar {
+      position: fixed;
+      transform: translateX(-100%);
+    }
+    
+    /* RTL mode - sidebar slides from RIGHT */
+    [dir="rtl"] #sidebar {
+      right: 0;
+      left: auto;
+      transform: translateX(100%);
+    }
+    
+    /* OPENED state - visible regardless of direction */
+    #sidebar.open {
+      transform: translateX(0) !important;
+    }
+    
+    /* Backdrop styling */
+    #sidebarBackdrop {
+      position: fixed;
+      top: 56px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+    }
+    #sidebarBackdrop.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    
+    /* Desktop sidebar - always VISIBLE inline */
+    @media (min-width: 1024px) {
+      #sidebar {
+        position: relative !important;
+        transform: none !important;
+        inset: auto !important;
+        width: 260px !important;
+        box-shadow: none !important;
+        border-right-style: solid;
+        border-left-style: none;
+      }
+      
+      [dir="rtl"] #sidebar {
+        border-right-style: none;
+        border-left-style: solid;
+      }
+    }
+    
+    /* Ensure tab panes render */
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block !important; }
+    
+    /* Font display swap - prevents invisible Arabic text */
+    @font-face {
+      font-family: 'Cairo';
+      font-weight: 400 800;
+      font-display: swap;
+    }
+    
+    @font-face {
+      font-family: 'Inter';
+      font-weight: 300 800;
+      font-display: swap;
+    }
+    
+    /* Force Arabic text visible */
+    [dir="rtl"] * {
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+    }
+  </style>
+
   <!-- Custom Styles -->
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col font-sans antialiased">
 
   <!-- TOP NAVIGATION BAR -->
-  <header class="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 py-3 flex items-center justify-between shadow-sm">
-    <div class="flex items-center space-x-3 rtl:space-x-reverse">
-      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-blue-600 flex items-center justify-center text-white shadow-md shadow-emerald-500/20">
-        <i data-lucide="building-2" class="w-6 h-6"></i>
+  <header id="mainHeader" class="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 px-2 py-2 sm:px-4 sm:py-3 flex items-center justify-between gap-1.5 sm:gap-2 shadow-sm" style="height: 56px;">
+    <div class="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-shrink-0">
+      <!-- Hamburger (mobile only) -->
+      <button id="btnSidebarToggle" class="flex-shrink-0 p-1.5 rounded-lg text-slate-600 hover:bg-slate-100 lg:hidden active:bg-slate-200 transition-colors touch-manipulation" aria-label="Toggle sidebar" style="min-width: 40px; min-height: 40px;">
+        <i data-lucide="menu" class="w-5 h-5"></i>
+      </button>
+
+      <div class="w-8 h-8 sm:w-9 sm:h-9 flex-shrink-0 rounded-xl bg-gradient-to-tr from-emerald-600 to-blue-600 flex items-center justify-center text-white shadow-md shadow-emerald-500/20">
+        <i data-lucide="building-2" class="w-4 h-4 sm:w-5 sm:h-5"></i>
       </div>
-      <div>
-        <div class="flex items-center gap-2">
-          <h1 class="text-lg font-bold tracking-tight text-slate-900" data-i18n="appTitle">Property Engine</h1>
-          <span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center gap-1">
+          <h1 class="text-[0.625rem] sm:text-sm md:text-base lg:text-lg font-bold tracking-tight text-slate-900 truncate" data-i18n="appTitle">Property Engine</h1>
+          <span class="hidden sm:inline-flex px-1.5 py-0.5 sm:px-2 sm:py-0.5 text-[9px] sm:text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 items-center gap-0.5 sm:gap-1 flex-shrink-0">
+            <span class="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
             Excel Live
           </span>
         </div>
-        <p class="text-xs text-slate-500 flex items-center gap-1">
-          <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5 text-emerald-600"></i>
-          <span id="headerWorkbookPath" class="truncate max-w-xs font-medium text-slate-700">property_engine.xlsx</span>
-          <span class="text-slate-300">•</span>
-          <span id="headerTotalRows" class="text-slate-600">Loading...</span>
+        <p class="hidden sm:flex text-xs text-slate-500 items-center gap-1 mt-0.5">
+          <i data-lucide="file-spreadsheet" class="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-600 flex-shrink-0"></i>
+          <span id="headerWorkbookPath" class="truncate max-w-[10rem] sm:max-w-[12rem] font-medium text-slate-700">property_engine.xlsx</span>
+          <span class="text-slate-300 flex-shrink-0">•</span>
+          <span id="headerTotalRows" class="text-slate-600 flex-shrink-0 text-[10px] sm:text-xs">Loading...</span>
+        </p>
+        <!-- Mobile row count -->
+        <p class="sm:hidden text-[10px] text-slate-500">
+          <span id="headerTotalRowsMobile" class="font-medium text-slate-600">Loading...</span>
         </p>
       </div>
     </div>
 
     <!-- Quick Action Controls -->
-    <div class="flex items-center space-x-2 rtl:space-x-reverse">
+    <div class="flex items-center gap-1 flex-shrink-0">
       <!-- Download Updated Excel -->
-      <a href="/api/workbook/download" download="property_engine.xlsx" class="px-3.5 py-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg flex items-center gap-1.5 shadow-sm shadow-emerald-600/20 transition-all active:scale-95">
-        <i data-lucide="download" class="w-4 h-4"></i>
-        <span class="hidden sm:inline" data-i18n="downloadExcel">Download Updated Excel</span>
-        <span class="sm:hidden">.xlsx</span>
+      <a href="/api/workbook/download" download="property_engine.xlsx" class="px-1.5 py-1.5 text-[10px] sm:text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg flex items-center gap-1 shadow-sm transition-all active:scale-95 touch-manipulation" style="min-height: 40px;">
+        <i data-lucide="download" class="w-3.5 h-3.5"></i>
+        <span class="hidden xl:inline" data-i18n="downloadExcel">Download</span>
       </a>
 
       <!-- Upload / Replace Excel -->
-      <button id="btnUploadModal" class="px-3 py-1.5 text-xs font-medium bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-lg flex items-center gap-1.5 shadow-sm transition-all active:scale-95">
-        <i data-lucide="upload-cloud" class="w-4 h-4 text-blue-600"></i>
-        <span class="hidden sm:inline" data-i18n="uploadExcel">Upload / Replace</span>
+      <button id="btnUploadModal" class="px-1.5 py-1.5 text-[10px] sm:text-xs font-medium bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-lg flex items-center gap-1 shadow-sm transition-all active:scale-95 touch-manipulation" style="min-height: 40px;">
+        <i data-lucide="upload-cloud" class="w-3.5 h-3.5 text-blue-600"></i>
+        <span class="hidden xl:inline" data-i18n="uploadExcel">Upload</span>
       </button>
 
-      <!-- Clean Orphan Rows -->
-      <button id="btnCleanOrphans" class="px-3 py-1.5 text-xs font-medium bg-white hover:bg-amber-50 text-amber-700 border border-amber-300 rounded-lg flex items-center gap-1.5 shadow-sm transition-all active:scale-95" title="Removes empty or corrupted rows without valid IDs">
-        <i data-lucide="sparkles" class="w-4 h-4 text-amber-600"></i>
-        <span class="hidden md:inline" data-i18n="cleanOrphans">Clean Orphans</span>
+      <!-- Clean Orphans - hidden on xs/sm -->
+      <button id="btnCleanOrphans" class="hidden sm:flex px-2 py-1.5 text-[10px] sm:text-xs font-medium bg-white hover:bg-amber-50 text-amber-700 border border-amber-300 rounded-lg items-center gap-1 shadow-sm transition-all active:scale-95 touch-manipulation" title="Removes empty or corrupted rows" style="min-height: 40px;">
+        <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-600"></i>
+        <span class="hidden lg:inline" data-i18n="cleanOrphans">Clean</span>
       </button>
 
-      <div class="h-5 w-px bg-slate-200 mx-1"></div>
+      <div class="hidden sm:block h-4 w-px bg-slate-200 mx-0.5"></div>
 
       <!-- RTL / LTR Toggle -->
-      <button id="btnLangToggle" class="px-3 py-1.5 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 rounded-lg flex items-center gap-1.5 transition-all">
-        <i data-lucide="languages" class="w-4 h-4 text-purple-600"></i>
-        <span id="currentLangLabel">English</span>
+      <button id="btnLangToggle" class="px-1.5 py-1.5 text-[10px] sm:text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300 rounded-lg flex items-center gap-1 transition-all touch-manipulation" style="min-height: 40px;">
+        <i data-lucide="languages" class="w-3.5 h-3.5 text-purple-600"></i>
+        <span id="currentLangLabel" class="hidden sm:inline">English</span>
       </button>
     </div>
   </header>
 
+  <!-- Sidebar Backdrop (mobile) -->
+  <div id="sidebarBackdrop" class="fixed inset-0 z-30 bg-slate-900/40 backdrop-blur-sm" style="top: 56px;"></div>
+
   <!-- MAIN APP CONTAINER (SIDEBAR + CONTENT) -->
-  <div class="flex-1 flex overflow-hidden">
+  <div class="flex-1 flex overflow-hidden relative app-layout-container">
     
     <!-- SIDEBAR NAVIGATION -->
-    <aside id="sidebar" class="w-64 bg-white border-r rtl:border-r-0 rtl:border-l border-slate-200 flex flex-col justify-between transition-all duration-200 z-30 shadow-sm">
-      <div class="py-4 px-3 space-y-6 overflow-y-auto">
+    <aside id="sidebar" class="bg-white border-r rtl:border-r-0 rtl:border-l border-slate-200 flex flex-col justify-between">
+      <div class="py-3 px-2 space-y-4 overflow-y-auto">
         <!-- Module Navigation Links -->
-        <nav class="space-y-1">
+        <nav class="space-y-0.5">
           <!-- 1. Overview -->
-          <button data-tab="overview" class="nav-item active w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all">
-            <i data-lucide="layout-dashboard" class="w-5 h-5 text-emerald-600"></i>
-            <span data-i18n="navOverview">Overview & Workbook</span>
+          <button data-tab="overview" class="nav-item active w-full flex items-center gap-2.5 px-2.5 py-2.5 text-sm font-medium rounded-xl transition-all touch-manipulation" style="min-height: 40px;">
+            <i data-lucide="layout-dashboard" class="w-5 h-5 text-emerald-600 shrink-0"></i>
+            <span class="truncate" data-i18n="navOverview">Overview & Workbook</span>
           </button>
 
           <!-- 2. Geo-Location -->
-          <button data-tab="locations" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all">
-            <i data-lucide="map-pin" class="w-5 h-5 text-blue-600"></i>
-            <span data-i18n="navLocations">Geo-Locations</span>
+          <button data-tab="locations" class="nav-item w-full flex items-center gap-2.5 px-2.5 py-2.5 text-sm font-medium rounded-xl transition-all touch-manipulation" style="min-height: 40px;">
+            <i data-lucide="map-pin" class="w-5 h-5 text-blue-600 shrink-0"></i>
+            <span class="truncate" data-i18n="navLocations">Geo-Locations</span>
           </button>
 
           <!-- 3. Taxonomy -->
-          <button data-tab="taxonomy" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all">
-            <i data-lucide="tag" class="w-5 h-5 text-purple-600"></i>
-            <span data-i18n="navTaxonomy">Property Taxonomy</span>
+          <button data-tab="taxonomy" class="nav-item w-full flex items-center gap-2.5 px-2.5 py-2.5 text-sm font-medium rounded-xl transition-all touch-manipulation" style="min-height: 40px;">
+            <i data-lucide="tag" class="w-5 h-5 text-purple-600 shrink-0"></i>
+            <span class="truncate" data-i18n="navTaxonomy">Property Taxonomy</span>
           </button>
 
           <!-- 4. Dynamic EAV -->
-          <button data-tab="eav" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all">
-            <i data-lucide="sliders-horizontal" class="w-5 h-5 text-amber-600"></i>
-            <span data-i18n="navEAV">Dynamic EAV Engine</span>
+          <button data-tab="eav" class="nav-item w-full flex items-center gap-2.5 px-2.5 py-2.5 text-sm font-medium rounded-xl transition-all touch-manipulation" style="min-height: 40px;">
+            <i data-lucide="sliders-horizontal" class="w-5 h-5 text-amber-600 shrink-0"></i>
+            <span class="truncate" data-i18n="navEAV">Dynamic EAV Engine</span>
           </button>
 
           <!-- 5. Properties & Rules -->
-          <button data-tab="properties" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all">
-            <i data-lucide="building" class="w-5 h-5 text-cyan-600"></i>
-            <span data-i18n="navProperties">Properties & Rules</span>
+          <button data-tab="properties" class="nav-item w-full flex items-center gap-2.5 px-2.5 py-2.5 text-sm font-medium rounded-xl transition-all touch-manipulation" style="min-height: 40px;">
+            <i data-lucide="building" class="w-5 h-5 text-cyan-600 shrink-0"></i>
+            <span class="truncate" data-i18n="navProperties">Properties & Rules</span>
           </button>
 
           <!-- 6. Bookable Units -->
-          <button data-tab="units" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all">
-            <i data-lucide="door-open" class="w-5 h-5 text-rose-600"></i>
-            <span data-i18n="navUnits">Bookable Units</span>
+          <button data-tab="units" class="nav-item w-full flex items-center gap-2.5 px-2.5 py-2.5 text-sm font-medium rounded-xl transition-all touch-manipulation" style="min-height: 40px;">
+            <i data-lucide="door-open" class="w-5 h-5 text-rose-600 shrink-0"></i>
+            <span class="truncate" data-i18n="navUnits">Bookable Units</span>
           </button>
 
           <!-- 7. Raw Sheets & i18n -->
-          <button data-tab="sheets" class="nav-item w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all">
-            <i data-lucide="table" class="w-5 h-5 text-indigo-600"></i>
-            <span data-i18n="navSheets">Raw Sheets & i18n</span>
+          <button data-tab="sheets" class="nav-item w-full flex items-center gap-2.5 px-2.5 py-2.5 text-sm font-medium rounded-xl transition-all touch-manipulation" style="min-height: 40px;">
+            <i data-lucide="table" class="w-5 h-5 text-indigo-600 shrink-0"></i>
+            <span class="truncate" data-i18n="navSheets">Raw Sheets & i18n</span>
           </button>
         </nav>
 
         <!-- Workbook Info Widget in Sidebar -->
-        <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-2">
+        <div class="mx-0 p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-2">
           <div class="flex items-center justify-between text-slate-500 font-medium">
             <span data-i18n="sheetsLabel">Total Sheets</span>
             <span class="font-bold text-slate-800">17</span>
@@ -175,20 +277,20 @@
     </aside>
 
     <!-- MAIN VIEW AREA -->
-    <main id="mainContent" class="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-50/70">
+    <main id="mainContent" class="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 bg-slate-50/70">
       
       <!-- TAB 1: OVERVIEW & WORKBOOK MANAGER -->
-      <section id="tab-overview" class="tab-pane active space-y-6">
+      <section id="tab-overview" class="tab-pane active space-y-4 sm:space-y-6">
         <!-- Hero Banner -->
-        <div class="relative overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-50 via-white to-slate-50 border border-slate-200 p-6 shadow-sm">
+        <div class="relative overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-50 via-white to-slate-50 border border-slate-200 p-3 sm:p-4 md:p-6 shadow-sm">
           <div class="relative z-10 max-w-3xl space-y-2">
-            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-800 text-xs font-semibold">
-              <i data-lucide="shield-check" class="w-4 h-4 text-emerald-600"></i>
+            <div class="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 py-0.5 sm:py-1 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-800 text-[10px] sm:text-xs font-semibold">
+              <i data-lucide="shield-check" class="w-3 h-3 sm:w-4 sm:h-4 text-emerald-600"></i>
               <span>Zero-Database Architecture • Direct Excel Persistence</span>
             </div>
-            <h2 class="text-2xl font-bold text-slate-900 tracking-tight" data-i18n="overviewHeroTitle">Property Engine Excel Simulation System</h2>
-            <p class="text-sm text-slate-600 leading-relaxed" data-i18n="overviewHeroDesc">
-              Simulating relational database operations, foreign key cascades, polymorphic translations, and dynamic EAV specification engines directly on <code class="px-1.5 py-0.5 rounded bg-slate-100 text-emerald-700 border border-slate-200 font-mono text-xs font-semibold">property_engine.xlsx</code>.
+            <h2 class="text-lg sm:text-xl md:text-2xl font-bold text-slate-900 tracking-tight" data-i18n="overviewHeroTitle">Property Engine Excel Simulation System</h2>
+            <p class="text-xs sm:text-sm text-slate-600 leading-relaxed" data-i18n="overviewHeroDesc">
+              Simulating relational database operations, foreign key cascades, polymorphic translations, and dynamic EAV specification engines directly on <code class="px-1 py-0.5 rounded bg-slate-100 text-emerald-700 border border-slate-200 font-mono text-xs font-semibold">property_engine.xlsx</code>.
             </p>
           </div>
           <div class="absolute -right-10 -bottom-10 opacity-5 text-emerald-800 pointer-events-none">
@@ -197,12 +299,12 @@
         </div>
 
         <!-- Metric Cards Grid -->
-        <div id="overviewMetricsGrid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div id="overviewMetricsGrid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
           <!-- Dynamically populated -->
         </div>
 
         <!-- Subsystems Architecture Map -->
-        <div class="grid grid-cols-1 lg:grid-cols-5 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
           <!-- 1. Geo -->
           <div class="bg-white border border-slate-200 rounded-xl p-4 space-y-3 shadow-sm hover:shadow-md transition-shadow">
             <div class="flex items-center justify-between">
@@ -291,12 +393,12 @@
 
         <!-- 17 Sheets Explorer Cards -->
         <div class="bg-white border border-slate-200 rounded-2xl p-6 space-y-4 shadow-sm">
-          <div class="flex items-center justify-between">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h3 class="text-base font-bold text-slate-900" data-i18n="sheetsCardTitle">All 17 Workbook Sheets</h3>
               <p class="text-xs text-slate-500" data-i18n="sheetsCardSub">Click any sheet to jump to its raw data table or management module</p>
             </div>
-            <button onclick="app.refreshAll()" class="px-3 py-1.5 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg flex items-center gap-1.5 transition-colors">
+            <button onclick="app.refreshAll()" class="self-start px-3 py-1.5 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg flex items-center gap-1.5 transition-colors touch-manipulation" style="min-height: 40px;">
               <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
               <span data-i18n="refresh">Refresh Stats</span>
             </button>
@@ -308,21 +410,21 @@
       </section>
 
       <!-- TAB 2: GEO-LOCATION MANAGER -->
-      <section id="tab-locations" class="tab-pane space-y-6">
+      <section id="tab-locations" class="tab-pane space-y-4 sm:space-y-6">
         <!-- Header -->
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div class="flex flex-col gap-3">
           <div>
             <h2 class="text-xl font-bold text-slate-900 tracking-tight" data-i18n="geoTitle">Geographic Hierarchy Manager</h2>
             <p class="text-xs text-slate-500" data-i18n="geoSubtitle">Cascading management for Countries, Cities, and Districts with localized Arabic/English names</p>
           </div>
-          <div class="flex items-center gap-2">
-            <button onclick="app.openGeoModal('Country')" class="px-3.5 py-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-1.5 shadow-sm shadow-blue-600/20">
+          <div class="flex flex-wrap gap-2">
+            <button onclick="app.openGeoModal('Country')" class="px-3.5 py-1.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-1.5 shadow-sm shadow-blue-600/20 touch-manipulation" style="min-height: 40px;">
               <i data-lucide="plus" class="w-4 h-4"></i> <span data-i18n="addCountry">Add Country</span>
             </button>
-            <button onclick="app.openGeoModal('City')" class="px-3 py-1.5 text-xs font-semibold bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-lg flex items-center gap-1.5 shadow-sm">
+            <button onclick="app.openGeoModal('City')" class="px-3 py-1.5 text-xs font-semibold bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-lg flex items-center gap-1.5 shadow-sm touch-manipulation" style="min-height: 40px;">
               <i data-lucide="plus" class="w-4 h-4"></i> <span data-i18n="addCity">Add City</span>
             </button>
-            <button onclick="app.openGeoModal('District')" class="px-3 py-1.5 text-xs font-semibold bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-lg flex items-center gap-1.5 shadow-sm">
+            <button onclick="app.openGeoModal('District')" class="px-3 py-1.5 text-xs font-semibold bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-lg flex items-center gap-1.5 shadow-sm touch-manipulation" style="min-height: 40px;">
               <i data-lucide="plus" class="w-4 h-4"></i> <span data-i18n="addDistrict">Add District</span>
             </button>
           </div>
@@ -331,7 +433,7 @@
         <!-- 3-Column Cascading Master-Detail View -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
           <!-- Col 1: Countries -->
-          <div class="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col h-[650px] shadow-sm">
+          <div class="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col h-[380px] md:h-[650px] shadow-sm">
             <div class="flex items-center justify-between pb-3 border-b border-slate-200">
               <div class="flex items-center gap-2">
                 <i data-lucide="globe" class="w-4 h-4 text-blue-600"></i>
@@ -340,15 +442,13 @@
               </div>
             </div>
             <div class="mt-2 mb-2">
-              <input type="text" id="countrySearch" placeholder="Search countries..." class="w-full px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <input type="text" id="countrySearch" placeholder="Search countries..." class="w-full px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500" style="min-height: 40px;">
             </div>
-            <div id="countryList" class="flex-1 overflow-y-auto space-y-1.5 pr-1">
-              <!-- Country items -->
-            </div>
+            <div id="countryList" class="flex-1 overflow-y-auto space-y-1.5 pr-1"></div>
           </div>
 
           <!-- Col 2: Cities -->
-          <div class="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col h-[650px] shadow-sm">
+          <div class="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col h-[380px] md:h-[650px] shadow-sm">
             <div class="flex items-center justify-between pb-3 border-b border-slate-200">
               <div class="flex items-center gap-2">
                 <i data-lucide="building" class="w-4 h-4 text-emerald-600"></i>
@@ -358,15 +458,13 @@
               <span id="selectedCountryName" class="text-xs text-blue-600 font-semibold truncate max-w-[120px]">All Countries</span>
             </div>
             <div class="mt-2 mb-2">
-              <input type="text" id="citySearch" placeholder="Search cities..." class="w-full px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+              <input type="text" id="citySearch" placeholder="Search cities..." class="w-full px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500" style="min-height: 40px;">
             </div>
-            <div id="cityList" class="flex-1 overflow-y-auto space-y-1.5 pr-1">
-              <!-- City items -->
-            </div>
+            <div id="cityList" class="flex-1 overflow-y-auto space-y-1.5 pr-1"></div>
           </div>
 
           <!-- Col 3: Districts -->
-          <div class="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col h-[650px] shadow-sm">
+          <div class="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col h-[380px] md:h-[650px] shadow-sm">
             <div class="flex items-center justify-between pb-3 border-b border-slate-200">
               <div class="flex items-center gap-2">
                 <i data-lucide="map-pin" class="w-4 h-4 text-purple-600"></i>
@@ -376,27 +474,25 @@
               <span id="selectedCityName" class="text-xs text-emerald-600 font-semibold truncate max-w-[120px]">All Cities</span>
             </div>
             <div class="mt-2 mb-2">
-              <input type="text" id="districtSearch" placeholder="Search districts..." class="w-full px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500">
+              <input type="text" id="districtSearch" placeholder="Search districts..." class="w-full px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500" style="min-height: 40px;">
             </div>
-            <div id="districtList" class="flex-1 overflow-y-auto space-y-1.5 pr-1">
-              <!-- District items -->
-            </div>
+            <div id="districtList" class="flex-1 overflow-y-auto space-y-1.5 pr-1"></div>
           </div>
         </div>
       </section>
 
       <!-- TAB 3: PROPERTY TAXONOMY & MATRIX -->
-      <section id="tab-taxonomy" class="tab-pane space-y-6">
+      <section id="tab-taxonomy" class="tab-pane space-y-4 sm:space-y-6">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h2 class="text-xl font-bold text-slate-900 tracking-tight" data-i18n="taxonomyTitle">Property Taxonomy & Combination Matrix</h2>
             <p class="text-xs text-slate-500" data-i18n="taxonomySubtitle">Define structural types, quality tiers, and toggle valid combinations with one click</p>
           </div>
-          <div class="flex items-center gap-2">
-            <button onclick="app.openTaxonomyModal('PropertyType')" class="px-3.5 py-1.5 text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white rounded-lg flex items-center gap-1.5 shadow-sm shadow-purple-600/20">
+          <div class="flex flex-wrap items-center gap-2">
+            <button onclick="app.openTaxonomyModal('PropertyType')" class="px-3.5 py-1.5 text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white rounded-lg flex items-center gap-1.5 shadow-sm shadow-purple-600/20 touch-manipulation" style="min-height: 40px;">
               <i data-lucide="plus" class="w-4 h-4"></i> <span data-i18n="addPropertyType">Add Property Type</span>
             </button>
-            <button onclick="app.openTaxonomyModal('PropertyClassification')" class="px-3 py-1.5 text-xs font-medium bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-lg flex items-center gap-1.5 shadow-sm">
+            <button onclick="app.openTaxonomyModal('PropertyClassification')" class="px-3 py-1.5 text-xs font-medium bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-lg flex items-center gap-1.5 shadow-sm touch-manipulation" style="min-height: 40px;">
               <i data-lucide="plus" class="w-4 h-4"></i> <span data-i18n="addClassification">Add Classification</span>
             </button>
           </div>
@@ -451,17 +547,17 @@
       </section>
 
       <!-- TAB 4: DYNAMIC EAV ENGINE BUILDER -->
-      <section id="tab-eav" class="tab-pane space-y-6">
+      <section id="tab-eav" class="tab-pane space-y-4 sm:space-y-6">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h2 class="text-xl font-bold text-slate-900 tracking-tight" data-i18n="eavTitle">Dynamic EAV Specification Engine</h2>
             <p class="text-xs text-slate-500" data-i18n="eavSubtitle">Manage Attribute Groups, Definitions, ENUM Options, and map attributes to Unit Types</p>
           </div>
-          <div class="flex items-center gap-2">
-            <button onclick="app.openAttributeGroupModal()" class="px-3 py-1.5 text-xs font-semibold bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-lg flex items-center gap-1.5 shadow-sm">
+          <div class="flex flex-wrap items-center gap-2">
+            <button onclick="app.openAttributeGroupModal()" class="px-3 py-1.5 text-xs font-semibold bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-lg flex items-center gap-1.5 shadow-sm touch-manipulation" style="min-height: 40px;">
               <i data-lucide="folder-plus" class="w-4 h-4 text-amber-600"></i> <span>Add Group</span>
             </button>
-            <button onclick="app.openAttributeDefModal()" class="px-3.5 py-1.5 text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white rounded-lg flex items-center gap-1.5 shadow-sm shadow-amber-600/20">
+            <button onclick="app.openAttributeDefModal()" class="px-3.5 py-1.5 text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white rounded-lg flex items-center gap-1.5 shadow-sm shadow-amber-600/20 touch-manipulation" style="min-height: 40px;">
               <i data-lucide="plus" class="w-4 h-4"></i> <span>Add Attribute Definition</span>
             </button>
           </div>
@@ -479,7 +575,7 @@
 
         <!-- EAV Subtab 1: Attribute Catalog -->
         <div id="eav-subtab-defs" class="space-y-4">
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <!-- Left: Groups List -->
             <div class="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 shadow-sm">
               <div class="flex items-center justify-between pb-2 border-b border-slate-200">
@@ -492,13 +588,13 @@
             </div>
 
             <!-- Right: Definitions Table -->
-            <div class="md:col-span-3 bg-white border border-slate-200 rounded-2xl p-5 space-y-3 shadow-sm">
-              <div class="flex items-center justify-between pb-2 border-b border-slate-200">
+            <div class="sm:col-span-2 lg:col-span-3 bg-white border border-slate-200 rounded-2xl p-5 space-y-3 shadow-sm">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-200">
                 <div class="flex items-center gap-2">
                   <i data-lucide="sliders" class="w-4 h-4 text-amber-600"></i>
                   <h3 class="text-sm font-bold text-slate-900">Attribute Definitions</h3>
                 </div>
-                <input type="text" id="attrDefSearch" placeholder="Filter definitions..." class="px-3 py-1 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                <input type="text" id="attrDefSearch" placeholder="Filter definitions..." class="w-full sm:w-auto sm:min-w-[200px] px-3 py-1 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500" style="min-height: 40px;">
               </div>
               <div class="overflow-x-auto">
                 <table class="w-full text-left rtl:text-right border-collapse text-xs">
@@ -530,12 +626,12 @@
                 <h3 class="text-base font-bold text-slate-900">Unit Type Attribute Schema Configuration</h3>
                 <p class="text-xs text-slate-500">Select a Unit Type to configure which attributes apply to it, with requirement and filterability overrides</p>
               </div>
-              <div class="flex items-center gap-3">
+              <div class="flex flex-wrap items-center gap-2 sm:gap-3">
                 <label class="text-xs text-slate-600 font-semibold">Select Unit Type:</label>
-                <select id="mapperUnitTypeSelect" onchange="app.loadUnitTypeMapper()" class="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-amber-500">
+                <select id="mapperUnitTypeSelect" onchange="app.loadUnitTypeMapper()" class="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-amber-500" style="min-height: 40px;">
                   <!-- Populated via app.js -->
                 </select>
-                <button onclick="app.saveUnitTypeMapper()" class="px-4 py-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg flex items-center gap-1.5 shadow-sm">
+                <button onclick="app.saveUnitTypeMapper()" class="px-4 py-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg flex items-center gap-1.5 shadow-sm touch-manipulation" style="min-height: 40px;">
                   <i data-lucide="save" class="w-4 h-4"></i> Save Mapping
                 </button>
               </div>
@@ -565,21 +661,21 @@
       </section>
 
       <!-- TAB 5: PROPERTIES & RULES MANAGER -->
-      <section id="tab-properties" class="tab-pane space-y-6">
+      <section id="tab-properties" class="tab-pane space-y-4 sm:space-y-6">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h2 class="text-xl font-bold text-slate-900 tracking-tight" data-i18n="propTitle">Properties & House Rules Manager</h2>
             <p class="text-xs text-slate-500" data-i18n="propSubtitle">Manage real-estate properties, physical addresses, GPS coordinates, multi-lingual details, and policies</p>
           </div>
-          <button onclick="app.openPropertyModal()" class="px-3.5 py-1.5 text-xs font-semibold bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg flex items-center gap-1.5 shadow-sm shadow-cyan-600/20">
+          <button onclick="app.openPropertyModal()" class="self-start sm:self-auto px-3.5 py-1.5 text-xs font-semibold bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg flex items-center gap-1.5 shadow-sm shadow-cyan-600/20 touch-manipulation" style="min-height: 40px;">
             <i data-lucide="plus" class="w-4 h-4"></i> <span data-i18n="addProperty">Add New Property</span>
           </button>
         </div>
 
         <!-- Filter bar -->
-        <div class="flex flex-wrap items-center gap-3 p-3 bg-white border border-slate-200 rounded-xl text-xs shadow-sm">
-          <input type="text" id="propertySearch" placeholder="Search by name, address, landmark..." class="flex-1 min-w-[200px] px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500">
-          <select id="propertyStatusFilter" class="px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-700 focus:outline-none">
+        <div class="flex flex-col sm:flex-row gap-2 p-3 bg-white border border-slate-200 rounded-xl text-xs shadow-sm">
+          <input type="text" id="propertySearch" placeholder="Search by name, address, landmark..." class="flex-1 px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500" style="min-height: 40px;">
+          <select id="propertyStatusFilter" class="px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-500" style="min-height: 40px;">
             <option value="">All Statuses</option>
             <option value="ACTIVE">ACTIVE</option>
             <option value="PENDING">PENDING</option>
@@ -587,7 +683,7 @@
             <option value="INACTIVE">INACTIVE</option>
             <option value="REJECTED">REJECTED</option>
           </select>
-          <select id="propertyTypeFilter" class="px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-700 focus:outline-none">
+          <select id="propertyTypeFilter" class="px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-500" style="min-height: 40px;">
             <option value="">All Types</option>
           </select>
         </div>
@@ -599,24 +695,24 @@
       </section>
 
       <!-- TAB 6: BOOKABLE UNITS & DYNAMIC ATTRIBUTES -->
-      <section id="tab-units" class="tab-pane space-y-6">
+      <section id="tab-units" class="tab-pane space-y-4 sm:space-y-6">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h2 class="text-xl font-bold text-slate-900 tracking-tight" data-i18n="unitsTitle">Bookable Units & Dynamic Attribute Engine</h2>
             <p class="text-xs text-slate-500" data-i18n="unitsSubtitle">Individual inventory units with typed EAV values, pricing, capacity, and live filterAttributes JSON sync</p>
           </div>
-          <button onclick="app.openUnitModal()" class="px-3.5 py-1.5 text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white rounded-lg flex items-center gap-1.5 shadow-sm shadow-rose-600/20">
+          <button onclick="app.openUnitModal()" class="self-start sm:self-auto px-3.5 py-1.5 text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white rounded-lg flex items-center gap-1.5 shadow-sm shadow-rose-600/20 touch-manipulation" style="min-height: 40px;">
             <i data-lucide="plus" class="w-4 h-4"></i> <span data-i18n="addUnit">Add Bookable Unit</span>
           </button>
         </div>
 
         <!-- Filter bar -->
-        <div class="flex flex-wrap items-center gap-3 p-3 bg-white border border-slate-200 rounded-xl text-xs shadow-sm">
-          <input type="text" id="unitSearch" placeholder="Search by unit name..." class="flex-1 min-w-[200px] px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-500">
-          <select id="unitPropertyFilter" class="px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-700 focus:outline-none">
+        <div class="flex flex-col sm:flex-row gap-2 p-3 bg-white border border-slate-200 rounded-xl text-xs shadow-sm">
+          <input type="text" id="unitSearch" placeholder="Search by unit name..." class="flex-1 px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-500" style="min-height: 40px;">
+          <select id="unitPropertyFilter" class="px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-rose-500" style="min-height: 40px;">
             <option value="">All Properties</option>
           </select>
-          <select id="unitTypeFilter" class="px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-700 focus:outline-none">
+          <select id="unitTypeFilter" class="px-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-rose-500" style="min-height: 40px;">
             <option value="">All Unit Types</option>
           </select>
         </div>
@@ -646,34 +742,33 @@
       </section>
 
       <!-- TAB 7: RAW SHEET EXPLORER & LOCALIZATION MATRIX -->
-      <section id="tab-sheets" class="tab-pane space-y-6">
+      <section id="tab-sheets" class="tab-pane space-y-4 sm:space-y-6">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h2 class="text-xl font-bold text-slate-900 tracking-tight" data-i18n="rawTitle">Raw Workbook Explorer & Localization Matrix</h2>
             <p class="text-xs text-slate-500" data-i18n="rawSubtitle">Direct access to all 17 Excel sheets, foreign key labels, and central Translation dictionary</p>
           </div>
-          <div class="flex items-center gap-2">
-            <button onclick="app.openAddRawRowModal()" class="px-3.5 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg flex items-center gap-1.5 shadow-sm shadow-indigo-600/20">
+          <div>
+            <button onclick="app.openAddRawRowModal()" class="px-3.5 py-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg flex items-center gap-1.5 shadow-sm shadow-indigo-600/20 touch-manipulation" style="min-height: 40px;">
               <i data-lucide="plus" class="w-4 h-4"></i> <span data-i18n="addRow">Add Row to Active Sheet</span>
             </button>
           </div>
         </div>
 
         <!-- Sheet Selector Tabs -->
-        <div class="flex flex-wrap gap-1.5 border-b border-slate-200 pb-2">
-          <!-- 17 sheet pills dynamically rendered -->
-          <div id="rawSheetPills" class="flex flex-wrap gap-1.5"></div>
+        <div class="flex gap-1.5 border-b border-slate-200 pb-2 overflow-x-auto">
+          <div id="rawSheetPills" class="flex gap-1.5"></div>
         </div>
 
         <!-- Active Raw Sheet Table -->
-        <div class="bg-white border border-slate-200 rounded-2xl p-5 space-y-3 shadow-sm">
-          <div class="flex items-center justify-between pb-2 border-b border-slate-200">
+        <div class="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-sm">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-200">
             <div class="flex items-center gap-2">
               <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-600"></i>
               <h3 id="rawCurrentSheetName" class="text-sm font-bold text-slate-900">Sheet</h3>
               <span id="rawCurrentRowCount" class="text-xs px-2.5 py-0.5 font-semibold rounded-full bg-slate-100 text-slate-700">0 rows</span>
             </div>
-            <input type="text" id="rawSearchInput" placeholder="Filter rows in sheet..." class="px-3 py-1 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <input type="text" id="rawSearchInput" placeholder="Filter rows in sheet..." class="w-full sm:w-auto sm:min-w-[200px] px-3 py-1 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500" style="min-height: 40px;">
           </div>
           <div class="overflow-x-auto max-h-[600px] overflow-y-auto">
             <table id="rawDataTable" class="w-full text-left rtl:text-right border-collapse text-xs font-mono">
@@ -694,7 +789,9 @@
   <!-- TOAST NOTIFICATION CONTAINER -->
   <div id="toastContainer" class="fixed bottom-4 right-4 rtl:right-auto rtl:left-4 z-50 space-y-2 pointer-events-none"></div>
 
-  <!-- Scripts -->
-  <script src="app.js"></script>
+  <!-- Scripts - Modular Architecture -->
+  <script src="js/api.js"></script>
+  <script src="js/views.js"></script>
+  <script src="js/app.js"></script>
 </body>
 </html>
